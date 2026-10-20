@@ -1,0 +1,12 @@
+[submodule "dac_core"]
+	path = dac_core
+	url = https://github.com/miziper/dac.git
+[submodule "dac_web"]
+	path = dac_web
+	url = https://github.com/miziper/dac_web.git
+[submodule "rdb"]
+	path = rdb
+	url = https://github.com/miziper/rdb-mhc.git
+[submodule "tpl"]
+	path = tpl
+	url = https://github.com/miziper/tpl.git
