@@ -1,0 +1,21 @@
+[project]
+name = "miz-tap"
+version = "0.0.1"
+description = "TAP Analysis Platform co-dev"
+readme = "ReadMe.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "dac_core",
+    "dac_web/backend",
+    "rdb/mh-backend",
+    "rdb/tc-backend",
+]
+
+[tool.uv.sources]
+miz-dac = {workspace = true}
+miz-dac-web = {workspace = true}
+miz-metahub = {workspace = true}
+miz-tc = {workspace = true}

@@ -1,0 +1,11 @@
+packages:
+  - "dac_web/dac-frontend"
+  - "rdb/mh-frontend"
+  - "rdb/tc-frontend"
+  - "tpl/tpl-frontend"
+overrides:
+  "@mizip/metahub": "workspace:*"
+  "@mizip/tc": "workspace:*"
+  "@mizip/dac_web": "workspace:*"
+allowBuilds:
+  esbuild: true
