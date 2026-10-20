@@ -1,0 +1,209 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "DAC: PostgreSQL",
+            "type": "shell",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/dac_web/backend"
+            },
+            "command": "podman run -it --rm --name dac_postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=dac -p 5431:5432 -v ./dac_web/db/:/docker-entrypoint-initdb.d/ postgres"
+        },
+        {
+            "label": "DAC: backend",
+            "type": "shell",
+            "problemMatcher": ["$python"],
+            "options": {
+                "cwd": "${workspaceFolder}/dac_web/backend",
+                "env": {
+                    "APP_LOG_ON": "1",
+                    "DBSTORE": "true",
+                    "LOG_DIR": "../storage/logs/",
+                    "PROJECT_DIR": "../storage/projects/",
+                    "POSTGRES_PORT": "5431",
+                    "KEYCLOAK_URL": "http://localhost:8080",
+                    "KEYCLOAK_URL_PUBLIC": "http://localhost:8080",
+                    "KEYCLOAK_REALM": "master",
+                    "KEYCLOAK_CLIENT_ID": "miz",
+                    "KEYCLOAK_CLIENT_SECRET": ""
+                }
+            },
+            "command": "until pg_isready -h localhost -p 5431; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8031 dac_web.main:app"
+        },
+        {
+            "label": "DAC: frontend",
+            "type": "shell",
+            "problemMatcher": ["$tsc"],
+            "options": {
+                "cwd": "${workspaceFolder}/dac_web/dac-frontend",
+                "env": {
+                    "VITE_API_PORT": "8031"
+                }
+            },
+            "command": "until /bin/nc -z localhost 8031; do sleep 1; done && pnpm run dev --port 5131 --open"
+        },
+        {
+            "label": "DAC",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "DAC: PostgreSQL",
+                "DAC: backend",
+                "DAC: frontend"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "TC: PostgreSQL",
+            "type": "shell",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/tc-backend"
+            },
+            "command": "podman run -it --rm --name tc_postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=tc -p 5430:5432 -v ./tc/db/:/docker-entrypoint-initdb.d/ docker.io/library/postgres"
+        },
+        {
+            "label": "TC: backend",
+            "type": "shell",
+            "problemMatcher": ["$python"],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/tc-backend",
+                "env": {
+                    "POSTGRES_PORT": "5430",
+                    "KEYCLOAK_URL": "http://localhost:8080",
+                    "KEYCLOAK_URL_PUBLIC": "http://localhost:8080",
+                    "KEYCLOAK_REALM": "master",
+                    "KEYCLOAK_CLIENT_ID": "miz"
+                }
+            },
+            "command": "until pg_isready -h localhost -p 5430; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8030 tc.main:app"
+        },
+        {
+            "label": "TC: frontend",
+            "type": "shell",
+            "problemMatcher": ["$tsc"],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/tc-frontend",
+                "env": {
+                    "VITE_API_PORT": "8030"
+                }
+            },
+            "command": "until /bin/nc -z localhost 8030; do sleep 1; done && pnpm run dev --port 5130 --open"
+        },
+        {
+            "label": "TC",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "TC: PostgreSQL",
+                "TC: backend",
+                "TC: frontend"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "MetaHub: PostgreSQL",
+            "type": "shell",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/mh-backend"
+            },
+            "command": "podman run -it --rm --name mh_postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=metahub -p 5433:5432 -v ./metahub/db/:/docker-entrypoint-initdb.d/ docker.io/library/postgres"
+        },
+        {
+            "label": "MetaHub: backend",
+            "type": "shell",
+            "problemMatcher": ["$python"],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/mh-backend",
+                "env": {
+                    "POSTGRES_PORT": "5433"
+                }
+            },
+            "command": "until pg_isready -h localhost -p 5433; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8033 metahub.main:app"
+        },
+        {
+            "label": "MetaHub: frontend",
+            "type": "shell",
+            "problemMatcher": ["$tsc"],
+            "options": {
+                "cwd": "${workspaceFolder}/rdb/mh-frontend",
+                "env": {
+                    "VITE_API_PORT": "8033"
+                }
+            },
+            "command": "until /bin/nc -z localhost 8033; do sleep 1; done && pnpm run dev --port 5133 --open"
+        },
+        {
+            "label": "MetaHub",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "MetaHub: PostgreSQL",
+                "MetaHub: backend",
+                "MetaHub: frontend"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "RDB: Full",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "MetaHub: PostgreSQL",
+                "MetaHub: backend",
+                "MetaHub: frontend",
+                "TC: PostgreSQL",
+                "TC: backend",
+                "TC: frontend"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "TPL: PostgreSQL",
+            "type": "shell",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/tpl/tpl-backend"
+            },
+            "command": "podman run -it --rm --name tpl_postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=tpl -p 5437:5432 -v ./tpl/sql/:/docker-entrypoint-initdb.d/ docker.io/library/postgres:18"
+        },
+        {
+            "label": "TPL: backend",
+            "type": "shell",
+            "problemMatcher": ["$python"],
+            "options": {
+                "cwd": "${workspaceFolder}/tpl/tpl-backend",
+                "env": {
+                    "DATABASE_URL": "postgresql://postgres:password@localhost:5437/tpl",
+                    "POSTGRES_PORT": "5437",
+                    "KEYCLOAK_URL": "http://localhost:8080",
+                    "KEYCLOAK_URL_PUBLIC": "http://localhost:8080",
+                    "KEYCLOAK_REALM": "master",
+                    "KEYCLOAK_CLIENT_ID": "miz",
+                    "KEYCLOAK_CLIENT_SECRET": ""
+                }
+            },
+            "command": "until pg_isready -h localhost -p 5437; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8037 tpl.main:app"
+        },
+        {
+            "label": "TPL: frontend",
+            "type": "shell",
+            "problemMatcher": ["$tsc"],
+            "options": {
+                "cwd": "${workspaceFolder}/tpl/tpl-frontend",
+                "env": {
+                    "VITE_API_PORT": "8037"
+                }
+            },
+            "command": "until /bin/nc -z localhost 8037; do sleep 1; done && pnpm run dev --port 5137 --open"
+        },
+        {
+            "label": "TPL",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "TPL: PostgreSQL",
+                "TPL: backend",
+                "TPL: frontend"
+            ],
+            "group": "build"
+        }
+    ]
+}

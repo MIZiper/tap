@@ -103,8 +103,9 @@ tpl/rsp-frontend
 
 规则：
 
-- 优先使用子模块的 VS Code 组合任务启动整套服务。
-- 前端通过 `VITE_API_PORT` 连接固定后端端口；修改端口必须同步更新 `.vscode/tasks.json`、Vite 配置和根 `ReadMe.md`。
+- 优先使用根 `.vscode/tasks.json` 或子模块的 VS Code 组合任务启动整套服务；根任务包含 `DAC`、`TC`、`MetaHub`、`RDB: Full`、`TPL`，不包含 RSP 和 Keycloak 容器。
+- 根任务复制了子模块的启动命令（VS Code 不会跨子模块共享 tasks），修改端口时必须同步更新根任务、对应子模块任务、Vite 配置和根 `ReadMe.md`。
+- 前端通过 `VITE_API_PORT` 连接固定后端端口。
 - TC 通过 `TC_METAHUB` 找 MetaHub，默认 `localhost:8033`。
 - 本地测试前如存在代理，先执行：
   ```bash
@@ -180,14 +181,18 @@ TC 的 descriptor 只负责投影，不限制 `content` 的原始结构。写入
 ### Keycloak
 
 - 所有后端在启用认证时必须自行验证 JWT；前端 `keycloak-js` 与角色判断只用于 UI。
-- 一个 realm 可以承载多个 client；当前任务配置：
-  - `dac_web`：`dac-frontend` / realm `miz`
-  - `tpl`：`tpl-frontend` / realm `miz`
-  - TC：`miz` / realm `master`（当前不一致，统一前不要假设等价）
-- 环境变量命名尚未统一：
-  - `dac_web`：`KEYCLOAK_URL`、`KEYCLOAK_URL_PUBLIC`、`KEYCLOAK_REALM`、`KEYCLOAK_CLIENT_ID`
-  - TC：`KC_SERVER_URL`、`KC_SERVER_URL_PUBLIC`、`KC_REALM`、`KC_CLIENT_ID`
-- 新增应用时应明确使用哪套命名，或先做配置适配层。
+- 统一配置：realm `master`、client `miz`。
+  - `dac_web`：`KEYCLOAK_REALM=master`、`KEYCLOAK_CLIENT_ID=miz`
+  - `tpl`：任务中预留相同配置，但后端尚未实现认证
+  - TC：`KEYCLOAK_REALM=master`、`KEYCLOAK_CLIENT_ID=miz`
+- 环境变量统一使用：
+  - `KEYCLOAK_URL`
+  - `KEYCLOAK_URL_PUBLIC`
+  - `KEYCLOAK_REALM`
+  - `KEYCLOAK_CLIENT_ID`
+  - `KEYCLOAK_CLIENT_SECRET`（仅 `dac_web` 当前使用）
+- TC 的内部 Settings 字段为 `keycloak_*`；对外 `/api/config` 仍返回 `kc_url`、`kc_realm`、`kc_client_id`，不要为改字段名而破坏前端契约。
+- 新增应用时必须复用上述命名与 realm/client，不要重新引入 `KC_*` 或独立 realm。
 
 ### 角色
 
@@ -201,9 +206,9 @@ nodes:review
 nodes:visibility:<name>
 ```
 
-- TC 从 realm roles 与 `resource_access.{client_id}.roles` 合并角色。
+- TC 从 realm roles 与 `resource_access.miz.roles` 合并角色（当前 client 为 `miz`）。
 - 节点创建者始终可编辑/查看自己的节点，即使没有全局角色。
-- `dac_web` 当前使用 `dac-admin` 作为管理角色。
+- `dac_web` 当前使用 `dac-admin` 作为管理角色，同样读取 `resource_access.miz.roles`。
 - 不要假设 `dac-admin` 与 `nodes:*` 等价；统一角色前先做映射。
 
 ### 审阅状态
@@ -308,7 +313,7 @@ cd tpl/rsp-frontend && pnpm check
 ## 11. 当前已知缺口
 
 - `dac_web`、`tpl` 尚未成为 TC 实例。
-- Keycloak env 命名、realm、角色未统一。
+- Keycloak env 命名、realm/client 已统一，但角色命名（`dac-admin` vs `nodes:*`）尚未统一。
 - 两套审阅状态未统一。
 - 缺少统一前端 shell、API client、跨应用导航。
 - TPL/RSP 后端与 RSP 前端不在根 workspace。

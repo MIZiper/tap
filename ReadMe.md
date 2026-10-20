@@ -92,20 +92,21 @@ tpl/rsp-frontend
 
 | 应用 | PostgreSQL | 后端 | 前端 | Keycloak client / realm | VS Code 组合任务 |
 |---|---:|---:|---:|---|---|
-| `dac_web` | 5431 | 8031 | 5131 | `dac-frontend` / `miz` | DAC |
-| `rdb` TC | 5430 | 8030 | 5130 | `miz` / `master`（当前任务配置） | TClient |
+| `dac_web` | 5431 | 8031 | 5131 | `miz` / `master` | DAC |
+| `rdb` TC | 5430 | 8030 | 5130 | `miz` / `master` | TC / TClient |
 | `rdb` MetaHub | 5433 | 8033 | 5133 | 无 | MetaHub |
-| `tpl` | 5437 | 8037 | 5137 | `tpl-frontend` / `miz` | TPL |
-| `tpl` RSP（暂缓） | 5439 | 8039 | 5139 | 无 | RSP |
-| Keycloak | - | 8080 | - | realm `miz` | 外部服务 |
+| `tpl` | 5437 | 8037 | 5137 | `miz` / `master` | TPL |
+| `tpl` RSP（暂缓） | 5439 | 8039 | 5139 | 无 | RSP（仅子模块） |
+| Keycloak | - | 8080 | - | realm `master` | 外部服务 |
 
 说明：
 
 - 前端通过 `VITE_API_PORT` 指向对应后端；Vite 默认只代理 `/api`（`dac_web` 还代理 `/app`、`/mpl`）。
 - `dac_core` 是库，没有固定端口。
-- TC 的 Keycloak realm 在当前任务里是 `master`，与 `dac_web`、`tpl` 的 `miz` 不一致。统一认证前不要假设两边角色和 realm 等价。
+- Keycloak 统一使用 realm `master`、client `miz`，环境变量统一使用 `KEYCLOAK_*`。
 - `tpl` 的 Keycloak 配置目前只是在任务中预留，后端尚未实现认证。
-- MetaHub 与 TC 是两个独立后端，可以分别启动，也可以使用 `rdb` 的 Full MHC 组合任务。
+- MetaHub 与 TC 是两个独立后端，可以分别启动，也可以使用根任务的 `RDB: Full`（或 `rdb/` 下的 `Full MHC`）。
+- 根目录 `.vscode/tasks.json` 也提供了 `DAC`、`TC`、`MetaHub`、`RDB: Full`、`TPL` 组合任务。
 
 ## 快速开始
 
@@ -133,7 +134,7 @@ pnpm install
 
 ## 运行各应用
 
-推荐直接使用各子模块根目录的 VS Code 任务；它们已经配置好固定端口、数据库端口和环境变量。
+推荐直接使用各子模块根目录或根目录 `.vscode/tasks.json` 的 VS Code 任务；它们已经配置好固定端口、数据库端口和环境变量。
 
 ### dac_core
 
@@ -160,7 +161,8 @@ uv run dac-bin
 cd backend
 POSTGRES_PORT=5431 DBSTORE=true \
 LOG_DIR=../storage/logs/ PROJECT_DIR=../storage/projects/ \
-KEYCLOAK_URL=http://localhost:8080 KEYCLOAK_REALM=miz KEYCLOAK_CLIENT_ID=dac-frontend \
+KEYCLOAK_URL=http://localhost:8080 KEYCLOAK_URL_PUBLIC=http://localhost:8080 \
+KEYCLOAK_REALM=master KEYCLOAK_CLIENT_ID=miz \
 uv run uvicorn --reload --port=8031 dac_web.main:app
 
 cd ../dac-frontend
@@ -181,7 +183,8 @@ VITE_API_PORT=8031 pnpm run dev --port 5131
 # TC
 cd rdb/tc-backend
 POSTGRES_PORT=5430 \
-KC_SERVER_URL=http://localhost:8080 KC_REALM=master KC_CLIENT_ID=miz \
+KEYCLOAK_URL=http://localhost:8080 KEYCLOAK_URL_PUBLIC=http://localhost:8080 \
+KEYCLOAK_REALM=master KEYCLOAK_CLIENT_ID=miz \
 uv run uvicorn --reload --port=8030 tc.main:app
 
 cd rdb/tc-frontend
@@ -211,11 +214,15 @@ TC 通过 `TC_METAHUB` 访问 MetaHub，默认值为 `localhost:8033`。
 ```bash
 cd tpl/tpl-backend
 DATABASE_URL=postgresql://postgres:password@localhost:5437/tpl \
+KEYCLOAK_URL=http://localhost:8080 KEYCLOAK_URL_PUBLIC=http://localhost:8080 \
+KEYCLOAK_REALM=master KEYCLOAK_CLIENT_ID=miz \
 uv run uvicorn --reload --port=8037 tpl.main:app
 
 cd tpl/tpl-frontend
 VITE_API_PORT=8037 pnpm run dev --port 5137
 ```
+
+> TPL 后端目前尚未实现认证；上述 Keycloak 变量与任务配置保持一致，供后续接入使用。
 
 ### rsp（暂缓）
 
@@ -229,6 +236,7 @@ VITE_API_PORT=8037 pnpm run dev --port 5137
 | TC schema | 启动时自动执行幂等 `tc/db/schema.sql`，并 seed 数据类型 |
 | dac_web schema | `backend/dac_web/db/schema.sql`，使用 PostgreSQL 18 的 `uuidv7()` |
 | Keycloak | 后端校验 JWT；前端使用 `keycloak-js`，前端角色判断只用于 UI |
+| Keycloak 配置 | 环境变量统一为 `KEYCLOAK_*`；本地使用 realm `master`、client `miz`、URL `http://localhost:8080` |
 | TC 角色 | `nodes:create`、`nodes:read_all`、`nodes:edit_any`、`nodes:review`、`nodes:visibility:{name}` |
 | dac_web 管理角色 | `dac-admin`（由 `admin_role` 配置） |
 | 敏感字段 | `creator_signature`、client secret、admin token 不得返回前端或写入日志 |
@@ -273,7 +281,7 @@ python3 tpl/scripts/test-integration.py
 ## 已知缺口
 
 - `dac_web`、`tpl` 尚未接入 TC；资源存储与搜索仍是各自实现。
-- 认证配置不统一：`dac_web` 使用 `KEYCLOAK_*`，TC 使用 `KC_*`；TC 任务中的 realm 也与 `dac_web`、`tpl` 不同。
+- Keycloak realm/client 与环境变量名已统一，但角色命名（`dac-admin` vs `nodes:*`）尚未统一。
 - 审阅状态不统一：`dac_web` 使用 `Registered/Approved/Rejected/Deleted`，TC 使用 `draft/pending_review/published/archived`。
 - 缺少统一的前端外壳、API client 和跨应用导航。
 - 根 workspace 未覆盖 TPL/RSP 后端和 RSP 前端。
