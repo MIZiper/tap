@@ -161,7 +161,7 @@ TC 的 descriptor 只负责投影，不限制 `content` 的原始结构。写入
 
 | 应用 | 默认数据库 | 主要存储 | 说明 |
 |---|---|---|---|
-| `dac_web` | `dac` | `nodes`、`histories`、`publishes` | 项目配置 JSONB；文件存储与 PostgreSQL 双模式，由 `DBSTORE` 控制 |
+| `dac_web` | `dac` | `nodes`、`histories`、`publishes`（已废弃） | 项目配置 JSONB；文件存储与 PostgreSQL 双模式，由 `DBSTORE` 控制 |
 | TC | `tc` | `nodes`、`node_tags`、`files`、`data_types`、`field_keys`、`node_fields` | schema 启动时自动应用，幂等 |
 | MetaHub | `metahub` | `clients`、`categories`、`tags`、`registered_nodes` | 标签树、下游客户端与节点登记 |
 | TPL | `tpl` | `documents` | `plan_document` / `execution_document` 为 JSONB |
@@ -183,7 +183,7 @@ TC 的 descriptor 只负责投影，不限制 `content` 的原始结构。写入
 - 所有后端在启用认证时必须自行验证 JWT；前端 `keycloak-js` 与角色判断只用于 UI。
 - 统一配置：realm `master`、client `miz`。
   - `dac_web`：`KEYCLOAK_REALM=master`、`KEYCLOAK_CLIENT_ID=miz`
-  - `tpl`：任务中预留相同配置，但后端尚未实现认证
+  - `tpl`：已接入相同配置，使用 JWT 保护文档创建与 TC 关联接口
   - TC：`KEYCLOAK_REALM=master`、`KEYCLOAK_CLIENT_ID=miz`
 - 环境变量统一使用：
   - `KEYCLOAK_URL`
@@ -208,21 +208,33 @@ nodes:visibility:<name>
 
 - TC 从 realm roles 与 `resource_access.miz.roles` 合并角色（当前 client 为 `miz`）。
 - 节点创建者始终可编辑/查看自己的节点，即使没有全局角色。
-- `dac_web` 当前使用 `dac-admin` 作为管理角色，同样读取 `resource_access.miz.roles`。
-- 不要假设 `dac-admin` 与 `nodes:*` 等价；统一角色前先做映射。
+- `dac_web` 使用 `tap:admin` 作为管理角色（`admin_role` 默认值），合并读取 realm roles 与 `resource_access.miz.roles`。
+- 应用管理角色统一为 `tap:admin`；内容/节点操作使用 TC 的 `nodes:*` 角色。
 
 ### 审阅状态
 
 - TC：`draft`、`pending_review`、`published`、`archived`，由 `nodes:review` 控制变更。
-- `dac_web`：`publishes.status` 为 `Registered`、`Approved`、`Rejected`、`Deleted`。
-- 两者不是同一套状态机。新增跨应用审阅功能时，先确定唯一状态源，必要时在边界层显式映射；不要在多处各自维护隐式状态。
-- `tpl` 当前没有认证与审阅模型（admin JSON 编辑器按本地可信工具处理）。
+- `dac_web` 的 `publishes.status` 已废弃；发布状态统一以外部关联系统的状态为准。
+- 应用只缓存外部状态，并根据 frozen 集合判断只读；不要重新引入第二套发布状态。
+- `tpl` 已接入 Keycloak JWT；未配置时保持本地匿名使用，尚无细粒度角色与审阅模型（admin JSON 编辑器按本地可信工具处理）。
 
 ### 敏感信息
 
 - `dac_web` 的 `creator_signature` 类似密码，禁止返回前端、展示或写入日志。
 - Keycloak client secret、admin token、数据库密码不得提交或打印。
 - 不要在文档、测试快照或错误响应中暴露 token。
+
+## 7.1 外部链接与 frozen
+
+- `dac_web` 与 `tpl` 只保存链接和状态缓存；TC 节点由用户在 TC 中创建。
+- 关联后 TC 拥有发布元数据（标题、描述、标签、状态），应用不要回写这些字段。
+- TPL 的 `plan` 和 `log` 是两个独立链接、独立状态、独立 frozen。
+- 外部状态属于 `EXTERNAL_FROZEN_STATUSES` 集合时，应用对应资源只读；`draft` 可编辑。
+- 已链接但外部状态不可确认时 fail-closed；未链接资源不受影响。
+- `dac_web` frozen 时仍允许 Save As；Save As 不继承外部链接。
+- 外部状态接口统一为 `GET/PATCH /api/nodes/{id}/state` 与 `GET/PUT/DELETE /api/nodes/{id}/source`。
+- 一个应用实例只配置一种 `EXTERNAL_SYSTEM`；当前实现 `tc`，WindChill 后续通过同一 provider 契约接入。
+- `dac_web` 的旧 `publishes`/`PubStatus` 已废弃，不再作为状态源。
 
 ## 8. 各应用关键机制
 
@@ -312,10 +324,10 @@ cd tpl/rsp-frontend && pnpm check
 
 ## 11. 当前已知缺口
 
-- `dac_web`、`tpl` 尚未成为 TC 实例。
-- Keycloak env 命名、realm/client 已统一，但角色命名（`dac-admin` vs `nodes:*`）尚未统一。
-- 两套审阅状态未统一。
+- `dac_web`、`tpl` 已支持 TC 链接，但尚未成为完整 TC 实例。
+- Keycloak env 命名、realm/client 与角色命名已统一为 `nodes:*` 和 `tap:admin`。
+- 应用不再维护自己的发布状态；状态以 TC 为准。
 - 缺少统一前端 shell、API client、跨应用导航。
 - TPL/RSP 后端与 RSP 前端不在根 workspace。
-- `tpl` 尚无认证与权限。
+- `tpl` 已支持 Keycloak 登录与 `nodes:create` / `nodes:edit_any` / `tap:admin` 基础权限，尚无审阅模型。
 - `dac_web` 与 TC 都使用 `uuidv7()`，依赖 PostgreSQL 18+。

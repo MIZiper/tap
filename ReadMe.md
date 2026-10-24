@@ -104,7 +104,7 @@ tpl/rsp-frontend
 - 前端通过 `VITE_API_PORT` 指向对应后端；Vite 默认只代理 `/api`（`dac_web` 还代理 `/app`、`/mpl`）。
 - `dac_core` 是库，没有固定端口。
 - Keycloak 统一使用 realm `master`、client `miz`，环境变量统一使用 `KEYCLOAK_*`。
-- `tpl` 的 Keycloak 配置目前只是在任务中预留，后端尚未实现认证。
+- `tpl` 已接入 Keycloak 登录/JWT（用于创建文档和关联 TC）；未配置 Keycloak 时仍可作为本地工具使用。
 - MetaHub 与 TC 是两个独立后端，可以分别启动，也可以使用根任务的 `RDB: Full`（或 `rdb/` 下的 `Full MHC`）。
 - 根目录 `.vscode/tasks.json` 也提供了 `DAC`、`TC`、`MetaHub`、`RDB: Full`、`TPL` 组合任务。
 
@@ -222,11 +222,46 @@ cd tpl/tpl-frontend
 VITE_API_PORT=8037 pnpm run dev --port 5137
 ```
 
-> TPL 后端目前尚未实现认证；上述 Keycloak 变量与任务配置保持一致，供后续接入使用。
+> TPL 后端已接入 Keycloak JWT，用于创建文档和关联 TC；未配置 Keycloak 时仍可作为本地工具使用。
 
 ### rsp（暂缓）
 
 端口保留为 PostgreSQL `5439`、后端 `8039`、前端 `5139`。当前不安排开发。
+
+## 外部链接与状态
+
+当前 `dac_web` 和 `tpl` 可以通过外部系统关联已存在的 TC 节点：
+
+1. 用户在 TC 中创建节点（`dac_web.project`、`tpl.plan` 或 `tpl.log`）。
+2. 用户在应用中执行“关联 TC 节点”，选择/输入 TC 节点。
+3. 应用保存外部节点 ID、链接和状态缓存，并在 TC 中写入来源链接。
+4. TC 拥有发布后的标题、描述、标签和状态；应用只读取状态。
+5. TC 状态属于 frozen 集合时，应用对应资源变只读；`draft` 状态仍可编辑。
+6. `dac_web` 的只读项目仍允许 **Save As**，创建一份不带 TC 链接的新项目。
+
+TPL 的 `plan` / `log` 分别关联不同 TC 节点，frozen 状态互不影响。
+
+本地默认配置：
+
+```text
+EXTERNAL_SYSTEM=tc
+EXTERNAL_SYSTEM_URL=http://localhost:8030
+EXTERNAL_SYSTEM_UI_URL=http://localhost:5130
+EXTERNAL_FROZEN_STATUSES=pending_review,published,archived
+PUBLIC_BASE_URL=http://localhost:5131   # dac_web；tpl 为 http://localhost:5137
+```
+
+TC 提供：
+
+```text
+GET    /api/nodes/{id}/state
+PATCH  /api/nodes/{id}/state          # nodes:review
+GET    /api/nodes/{id}/source
+PUT    /api/nodes/{id}/source
+DELETE /api/nodes/{id}/source
+```
+
+接口通过 `provider` 字段抽象外部系统；当前只实现 `tc`，未来 `windchill` 使用同一链接/状态契约，一个应用实例只配置一种外部系统。
 
 ## 共享配置速查
 
@@ -237,8 +272,9 @@ VITE_API_PORT=8037 pnpm run dev --port 5137
 | dac_web schema | `backend/dac_web/db/schema.sql`，使用 PostgreSQL 18 的 `uuidv7()` |
 | Keycloak | 后端校验 JWT；前端使用 `keycloak-js`，前端角色判断只用于 UI |
 | Keycloak 配置 | 环境变量统一为 `KEYCLOAK_*`；本地使用 realm `master`、client `miz`、URL `http://localhost:8080` |
+| 外部链接 | `EXTERNAL_SYSTEM`、`EXTERNAL_SYSTEM_URL`、`EXTERNAL_SYSTEM_UI_URL`、`EXTERNAL_FROZEN_STATUSES`、`PUBLIC_BASE_URL` |
 | TC 角色 | `nodes:create`、`nodes:read_all`、`nodes:edit_any`、`nodes:review`、`nodes:visibility:{name}` |
-| dac_web 管理角色 | `dac-admin`（由 `admin_role` 配置） |
+| 应用管理角色 | `tap:admin`（`dac_web` 由 `admin_role` 配置，默认 `tap:admin`） |
 | 敏感字段 | `creator_signature`、client secret、admin token 不得返回前端或写入日志 |
 | 代理 | `dac_web` 前端使用 `/api`、`/app`、`/mpl`；其他前端主要使用 `/api` |
 
@@ -280,9 +316,9 @@ python3 tpl/scripts/test-integration.py
 
 ## 已知缺口
 
-- `dac_web`、`tpl` 尚未接入 TC；资源存储与搜索仍是各自实现。
-- Keycloak realm/client 与环境变量名已统一，但角色命名（`dac-admin` vs `nodes:*`）尚未统一。
-- 审阅状态不统一：`dac_web` 使用 `Registered/Approved/Rejected/Deleted`，TC 使用 `draft/pending_review/published/archived`。
+- `dac_web`、`tpl` 已支持关联 TC 节点，但内容和运行逻辑仍保存在各自应用，尚未成为完整 TC 实例。
+- Keycloak realm/client 与环境变量名已统一，角色命名统一为 `nodes:*` 与 `tap:admin`。
+- TC 状态通过链接控制应用只读；应用自身的旧发布状态已废弃。
 - 缺少统一的前端外壳、API client 和跨应用导航。
 - 根 workspace 未覆盖 TPL/RSP 后端和 RSP 前端。
-- `tpl` 尚无认证与权限模型。
+- `tpl` 已支持 Keycloak 登录和 `nodes:create` / `nodes:edit_any` / `tap:admin` 基础权限，尚无审阅模型。

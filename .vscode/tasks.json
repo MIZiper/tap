@@ -26,7 +26,12 @@
                     "KEYCLOAK_URL_PUBLIC": "http://localhost:8080",
                     "KEYCLOAK_REALM": "master",
                     "KEYCLOAK_CLIENT_ID": "miz",
-                    "KEYCLOAK_CLIENT_SECRET": ""
+                    "KEYCLOAK_CLIENT_SECRET": "",
+                    "PUBLIC_BASE_URL": "http://localhost:5131",
+                    "EXTERNAL_SYSTEM": "tc",
+                    "EXTERNAL_SYSTEM_URL": "http://localhost:8030",
+                    "EXTERNAL_SYSTEM_UI_URL": "http://localhost:5130",
+                    "EXTERNAL_FROZEN_STATUSES": "pending_review,published,archived"
                 }
             },
             "command": "until pg_isready -h localhost -p 5431; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8031 dac_web.main:app"
@@ -178,7 +183,12 @@
                     "KEYCLOAK_URL_PUBLIC": "http://localhost:8080",
                     "KEYCLOAK_REALM": "master",
                     "KEYCLOAK_CLIENT_ID": "miz",
-                    "KEYCLOAK_CLIENT_SECRET": ""
+                    "KEYCLOAK_CLIENT_SECRET": "",
+                    "PUBLIC_BASE_URL": "http://localhost:5137",
+                    "EXTERNAL_SYSTEM": "tc",
+                    "EXTERNAL_SYSTEM_URL": "http://localhost:8030",
+                    "EXTERNAL_SYSTEM_UI_URL": "http://localhost:5130",
+                    "EXTERNAL_FROZEN_STATUSES": "pending_review,published,archived"
                 }
             },
             "command": "until pg_isready -h localhost -p 5437; do echo 'Waiting for Postgres...'; sleep 1; done && uv run uvicorn --reload --port=8037 tpl.main:app"
