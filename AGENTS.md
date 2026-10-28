@@ -226,15 +226,19 @@ nodes:visibility:<name>
 
 ## 7.1 外部链接与 frozen
 
-- `dac_web` 与 `tpl` 只保存链接和状态缓存；TC 节点由用户在 TC 中创建。
-- 关联后 TC 拥有发布元数据（标题、描述、标签、状态），应用不要回写这些字段。
+- 用户在 TC 中创建统一的 `SourceItem.v00`，再从 `dac_web` / `tpl` 关联；source 类型（`dac_web.project`、`tpl.plan`、`tpl.log`）不提供给用户直接创建。
+- source 应用在 `PUT /api/nodes/{id}/source` 中带 `data_type`；TC 原子写入 source 字段并回填 `content_type`。解链时恢复 `SourceItem.v00`。
+- source 应用使用 `GET /api/nodes/source-candidates` 搜索未链接的 Source Item。
+- 关联后 TC 拥有发布元数据（标题、描述、标签、状态），应用不要回写这些字段；TC 详情页显示来源应用与跳转链接。
+- 已链接节点的 content 由 source 控制；只有 `nodes:edit_any` 可以在 TC 中直接修改。
 - TPL 的 `plan` 和 `log` 是两个独立链接、独立状态、独立 frozen。
-- 外部状态属于 `EXTERNAL_FROZEN_STATUSES` 集合时，应用对应资源只读；`draft` 可编辑。
+- frozen 判定：`nodes.frozen = true` 或 status ∈ `TC_FROZEN_STATUSES`；应用侧 `EXTERNAL_FROZEN_STATUSES` 作为 fallback。frozen 节点拒绝 `/push/data`（423）。
 - 已链接但外部状态不可确认时 fail-closed；未链接资源不受影响。
 - `dac_web` frozen 时仍允许 Save As；Save As 不继承外部链接。
 - 外部状态接口统一为 `GET/PATCH /api/nodes/{id}/state` 与 `GET/PUT/DELETE /api/nodes/{id}/source`。
 - 一个应用实例只配置一种 `EXTERNAL_SYSTEM`；当前实现 `tc`，WindChill 后续通过同一 provider 契约接入。
 - `dac_web` 的旧 `publishes`/`PubStatus` 已废弃，不再作为状态源。
+- `dac_web` 的 `Push data to TC` action 将 `TimeData`/`FreqDomainData` 转为 `Tabular.v00`，通过 `PUT /api/nodes/{id}/push/data` 推送；`node_contributions` 记录来源，允许多个项目向同一 item 追加。push 权限沿用 `check_edit_node`（creator 或 `nodes:edit_any`），不新增角色。
 
 ## 8. 各应用关键机制
 

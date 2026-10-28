@@ -232,12 +232,14 @@ VITE_API_PORT=8037 pnpm run dev --port 5137
 
 当前 `dac_web` 和 `tpl` 可以通过外部系统关联已存在的 TC 节点：
 
-1. 用户在 TC 中创建节点（`dac_web.project`、`tpl.plan` 或 `tpl.log`）。
-2. 用户在应用中执行“关联 TC 节点”，选择/输入 TC 节点。
-3. 应用保存外部节点 ID、链接和状态缓存，并在 TC 中写入来源链接。
-4. TC 拥有发布后的标题、描述、标签和状态；应用只读取状态。
-5. TC 状态属于 frozen 集合时，应用对应资源变只读；`draft` 状态仍可编辑。
+1. 用户在 TC 中创建统一的 **Source Item**（`SourceItem.v00`），只填标题、描述、标签和可见性。
+2. 用户在应用中执行“关联 TC 节点”，从“未链接的 Source Item”中选择；source 应用在链接请求中带上具体 `data_type`。
+3. TC 原子写入来源链接并回填类型（`dac_web.project`、`tpl.plan`、`tpl.log`），应用保存外部节点 ID、链接和状态缓存。
+4. TC 拥有发布后的标题、描述、标签和状态；应用只读取状态。TC 详情页显示来源应用和跳转链接。
+5. TC 状态属于 frozen 集合、或节点 `frozen` 为真时，应用对应资源变只读，`/push/data` 也会拒绝写入。
 6. `dac_web` 的只读项目仍允许 **Save As**，创建一份不带 TC 链接的新项目。
+
+`dac_web` 还可以把分析结果（目前支持 `TimeData` / `FreqDomainData`）通过 `Push data to TC` action 推送为 `Tabular.v00`。多个项目可以向同一个 item 追加内容，TC 用 `node_contributions` 记录每个来源。
 
 TPL 的 `plan` / `log` 分别关联不同 TC 节点，frozen 状态互不影响。
 
@@ -254,11 +256,16 @@ PUBLIC_BASE_URL=http://localhost:5131   # dac_web；tpl 为 http://localhost:513
 TC 提供：
 
 ```text
+GET    /api/nodes/source-candidates   # unlinked Source Items
+GET    /api/nodes/push-candidates     # editable, non-frozen push targets
 GET    /api/nodes/{id}/state
 PATCH  /api/nodes/{id}/state          # nodes:review
 GET    /api/nodes/{id}/source
-PUT    /api/nodes/{id}/source
+PUT    /api/nodes/{id}/source          # carries data_type
 DELETE /api/nodes/{id}/source
+PUT    /api/nodes/{id}/push/data       # frozen nodes return 423
+GET    /api/nodes/{id}/contributions
+GET    /api/nodes/contributions?source_system=...&source_id=...
 ```
 
 接口通过 `provider` 字段抽象外部系统；当前只实现 `tc`，未来 `windchill` 使用同一链接/状态契约，一个应用实例只配置一种外部系统。
@@ -273,6 +280,7 @@ DELETE /api/nodes/{id}/source
 | Keycloak | 后端校验 JWT；前端使用 `keycloak-js`，前端角色判断只用于 UI |
 | Keycloak 配置 | 环境变量统一为 `KEYCLOAK_*`；本地使用 realm `master`、client `miz`、URL `http://localhost:8080` |
 | 外部链接 | `EXTERNAL_SYSTEM`、`EXTERNAL_SYSTEM_URL`、`EXTERNAL_SYSTEM_UI_URL`、`EXTERNAL_FROZEN_STATUSES`、`PUBLIC_BASE_URL` |
+| TC frozen | `TC_FROZEN_STATUSES`（默认 `pending_review,published,archived`） |
 | TC 角色 | `nodes:create`、`nodes:read_all`、`nodes:edit_any`、`nodes:review`、`nodes:visibility:{name}` |
 | 应用管理角色 | `tap:admin`（`dac_web` 由 `admin_role` 配置，默认 `tap:admin`） |
 | 敏感字段 | `creator_signature`、client secret、admin token 不得返回前端或写入日志 |
