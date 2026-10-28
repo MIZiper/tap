@@ -12,6 +12,7 @@ members = [
     "dac_web/backend",
     "rdb/mh-backend",
     "rdb/tc-backend",
+    "tpl/tpl-backend",
 ]
 
 [tool.uv.sources]
@@ -19,3 +20,4 @@ miz-dac = {workspace = true}
 miz-dac-web = {workspace = true}
 miz-metahub = {workspace = true}
 miz-tc = {workspace = true}
+tpl-backend = {workspace = true}
