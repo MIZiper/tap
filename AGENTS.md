@@ -215,7 +215,7 @@ nodes:visibility:<name>
 
 - TC：`draft`、`pending_review`、`published`、`archived`。创建者只能提交 `draft → pending_review`；`nodes:review` 只能处理 `pending_review → draft/published/archived`。只有 `draft` 可以编辑元数据或内容，`nodes:edit_any` 例外。
 - `dac_web` 的 `publishes.status` 已废弃；发布状态统一以外部关联系统的状态为准。
-- 应用只缓存外部状态，并根据 frozen 集合判断只读；不要重新引入第二套发布状态。
+- 应用不缓存外部状态（只在读取时实时查询），并根据 frozen 集合判断只读；不要重新引入第二套发布状态。
 - `tpl` 已接入 Keycloak JWT；未配置时保持本地匿名使用，尚无细粒度角色与审阅模型（admin JSON 编辑器按本地可信工具处理）。
 
 ### 敏感信息
@@ -232,8 +232,8 @@ nodes:visibility:<name>
 - 关联后 TC 拥有发布元数据（标题、描述、标签、状态），应用不要回写这些字段；TC 详情页显示来源应用与跳转链接。
 - 已链接节点的 content 由 source 控制；只有 `nodes:edit_any` 可以在 TC 中直接修改。
 - TPL 的 `plan` 和 `log` 是两个独立链接、独立状态、独立 frozen。
-- frozen 判定：`nodes.frozen = true` 或 status ∈ `TC_FROZEN_STATUSES`；应用侧 `EXTERNAL_FROZEN_STATUSES` 作为 fallback。frozen 节点拒绝 `/push/data`（423）。
-- 已链接但外部状态不可确认时 fail-closed；未链接资源不受影响。
+- frozen 判定：status ∈ `TC_FROZEN_STATUSES`；应用侧 `EXTERNAL_FROZEN_STATUSES` 作为 fallback。frozen 节点拒绝 `/push/data`（423）。
+- 已链接但外部状态不可确认时 fail-closed：项目只读，Save 与 Unlink 均被拒绝（423/503）；未链接资源不受影响。
 - `dac_web` frozen 时仍允许 Save As；Save As 不继承外部链接。
 - 外部状态接口统一为 `GET/PATCH /api/nodes/{id}/state` 与 `GET/PUT/DELETE /api/nodes/{id}/source`。
 - 一个应用实例只配置一种 `EXTERNAL_SYSTEM`；当前实现 `tc`，WindChill 后续通过同一 provider 契约接入。
