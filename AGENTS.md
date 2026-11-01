@@ -213,7 +213,7 @@ nodes:visibility:<name>
 
 ### 审阅状态
 
-- TC：`draft`、`pending_review`、`published`、`archived`，由 `nodes:review` 控制变更。
+- TC：`draft`、`pending_review`、`published`、`archived`。创建者只能提交 `draft → pending_review`；`nodes:review` 只能处理 `pending_review → draft/published/archived`。只有 `draft` 可以编辑元数据或内容，`nodes:edit_any` 例外。
 - `dac_web` 的 `publishes.status` 已废弃；发布状态统一以外部关联系统的状态为准。
 - 应用只缓存外部状态，并根据 frozen 集合判断只读；不要重新引入第二套发布状态。
 - `tpl` 已接入 Keycloak JWT；未配置时保持本地匿名使用，尚无细粒度角色与审阅模型（admin JSON 编辑器按本地可信工具处理）。
